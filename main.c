@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <string.h>
 
 typedef uint64_t u64;
 typedef uint8_t u8;
@@ -11,8 +12,8 @@ typedef struct {
     u64 result;
 } DecodeResult;
 
-void print_byte(u8 data) {
-    u8 buf[8] = { 0 };
+void print_u8_binary(u8 data) {
+    u8 buf[8] = {0};
     for (int i = 0; i < 8; i++) {
         buf[7 - i] = (data >> i) & 0x1;
     }
@@ -20,13 +21,42 @@ void print_byte(u8 data) {
     for (int i = 0; i < 8; i++) {
         printf("%d", buf[i]);
     }
-    printf("\n");
 }
 
+void print_u64_binary(u64 data) {
+    for (int i = 63; i >= 0; i--) {
+        putchar((data >> i) & 0x01 ? '1' : '0');
+    }
+    putchar('\n');
+}
 
-u8* encode(u64 data) {
-    (void)data;
-    return NULL;
+int encode(u64 src, u8* dst, u64 len) {
+    int bytes_written = 0;
+    u8 buf[10] = {0};
+
+    // print_u64_binary(src);
+    for (int i = 0; src != 0; i++) {
+        buf[i] = src & 0b01111111 ;
+        bytes_written++;
+        // print_u8_binary(buf[i]);
+        // printf("\n");
+        src >>= 7;
+    }
+    // printf("bytes_written: %d\n", bytes_written);
+
+    for (int i = 0; i < bytes_written - 1; i++) {
+        buf[i] |= 0b10000000;
+    }
+
+    // for (int i = 0; i < 10; i++) {
+    //     print_u8_binary(buf[i]);
+    // }
+    // printf("\n");
+    //
+    if ((u64)bytes_written <= len) {
+        memcpy(dst, buf, 10);
+    }
+    return bytes_written;
 }
 
 DecodeResult decode_pure(const u8* src, u64 offset) {
@@ -68,27 +98,29 @@ int decode(const u8* src, u64* dst) {
     return bytes_consumed;
 }
 
-int main() {
-    // assert(decode((u8[]){0x96, 0x01}) == 150);
-    // assert(decode((u8[]){0x00}) == 0);
-    // assert(decode((u8[]){0x01}) == 1);
-    // assert(decode((u8[]){0x7f}) == 127);
-    // assert(decode((u8[]){0x80, 0x01}) == 128);
-    // assert(decode((u8[]){0xac, 0x02}) == 300);
-
-
-    // DecodeResult a = decode_pure(data, 0);
-    // DecodeResult b = decode_pure(data, a.offset);
-
-    u8 data[] = {0xac, 0x02, 0x96, 0x01};
-    u64 a, b;
-    int offset = decode(data, &a);
-    decode(data + offset, &b);
-
-    printf("%lu %lu\n", a, b);
-
-
-    // assert(decode(v).result == 3 && decode(v).offset == 2);
-    printf("All tests passed!\n");
+void test_decode_encode(u64 x) {
+    u8 arr[10] = {0};
+    u64 result = 0;
+    encode(x, arr, 10);
+    decode(arr, &result);
+    //printf("assert(%ld == %ld)\n", x, result);
+    assert(x == result);
 }
 
+int main() {
+    for (u64 i = 0; i < 1000000; i++) {
+        //printf("run %ld\n", i);
+        test_decode_encode(i);
+    }
+
+    // u8 buf[10] = {0};
+    // encode(129, buf, 10);
+    //
+    // printf("\n");
+    // u64 x;
+    // decode(buf, &x);
+    // print_u64_binary(x);
+    // printf("%ld\n", x);
+
+    printf("All tests passed!\n");
+}
