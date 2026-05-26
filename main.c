@@ -1,9 +1,15 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <assert.h>
 
-typedef unsigned long u64;
-typedef unsigned char u8;
+typedef uint64_t u64;
+typedef uint8_t u8;
+
+typedef struct {
+    u64 offset;
+    u64 result;
+} DecodeResult;
 
 void print_byte(u8 data) {
     u8 buf[8] = { 0 };
@@ -23,26 +29,66 @@ u8* encode(u64 data) {
     return NULL;
 }
 
-u64 decode(u8* arr) {
-    // We get an array of bytes that we don't know the range
-    // OMEGA DANGERIOOOOOOS
-    u64 ret = 0;
-    u8 offset = 0;
-    u8 continue_bit = 1;
-    for (int i = 0; continue_bit; i++) {
-        continue_bit = arr[i] >> 7;
+DecodeResult decode_pure(const u8* src, u64 offset) {
+    u64 result = 0;
+    u8 bit_shift = 0;
+    u64 bytes_consumed = 0;
+    const u8* arr = src + offset;
+
+    for (int i = 0; i < 10; i++) {
+        u8 continue_bit = arr[i] >> 7;
         // drop the continuation bit
-        arr[i] &= 0b01111111;
-        u64 y = arr[i];
-        ret |= y << offset;
-        offset += 7;
+        u64 tmp = arr[i];
+        tmp &= 0b01111111;
+        result |= tmp << bit_shift;
+        bit_shift += 7;
+        bytes_consumed++;
+        if (continue_bit == 0) break;
+    }
+    return (DecodeResult){offset + bytes_consumed, result};
+}
+
+int decode(const u8* src, u64* dst) {
+    int bytes_consumed = 0;
+    u8 bit_shift = 0;
+    u64 result = 0;
+
+    for (int i = 0; i < 10; i++) {
+        u8 continue_bit = src[i] >> 7;
+
+        u64 tmp = src[i] & 0b01111111;
+        result |= tmp << bit_shift;
+        bit_shift += 7;
+        bytes_consumed++;
+
         if (continue_bit == 0) break;
     }
 
-    return ret;
+    *dst = result;
+    return bytes_consumed;
 }
 
 int main() {
-    u8 arr[] = {0x96, 0x01};
-    printf("%zu\n", decode(arr));
+    // assert(decode((u8[]){0x96, 0x01}) == 150);
+    // assert(decode((u8[]){0x00}) == 0);
+    // assert(decode((u8[]){0x01}) == 1);
+    // assert(decode((u8[]){0x7f}) == 127);
+    // assert(decode((u8[]){0x80, 0x01}) == 128);
+    // assert(decode((u8[]){0xac, 0x02}) == 300);
+
+
+    // DecodeResult a = decode_pure(data, 0);
+    // DecodeResult b = decode_pure(data, a.offset);
+
+    u8 data[] = {0xac, 0x02, 0x96, 0x01};
+    u64 a, b;
+    int offset = decode(data, &a);
+    decode(data + offset, &b);
+
+    printf("%lu %lu\n", a, b);
+
+
+    // assert(decode(v).result == 3 && decode(v).offset == 2);
+    printf("All tests passed!\n");
 }
+
